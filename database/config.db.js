@@ -13,17 +13,29 @@ const dbConnection = async()=>{
 
     }
 
-    sql.connect(dbSettings)
+    try{ 
+        const pool = await sql.connect(dbSettings)
+        console.log(`Conexión a la base de datos ${dbSettings.database} establecida`);
+        return pool
+    }
+    catch(err){
+        console.log('Error al conectar a la base de datos:', err);
+    }
+   
+    
+    
+    /*
     .then(()=>{
         console.log(`Conexión a la base de datos ${dbSettings.database} establecida`);
-        //return sql
+        return pool
     })
     .catch((err) => {
-      console.log('Error al conectar a la base de datos:', err);
-    });
+        console.log('Error al conectar a la base de datos:', err);
+    });*/
 
 }
 
 module.exports = {
-    dbConnection, sql
+    dbConnection,
+    sql
 }

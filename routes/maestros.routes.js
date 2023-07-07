@@ -4,6 +4,7 @@ const { check } = require('express-validator')
 const { maestroGet, maestroPost, maestroPut } = require('../controllers/maestros.controller')
 
 const {validarCampos} = require('../middlewares/validar-campos')
+const {esUsuarioValido} = require('../helpers/validadores')
 
 const router = Router()
 
@@ -21,6 +22,7 @@ router.post('/',[
     check('correo','El correo es obligatorio').isEmail(),
     check('domicilio','El domicilio es obligatorio').not().isEmpty(),
     check('municipio','El municipio es obligatorio').not().isEmpty(),
+    check('usuario','A vergaaa').custom((usuario)=> esUsuarioValido(usuario) ),
     validarCampos
 ], maestroPost)
 //Actualizar Datos
