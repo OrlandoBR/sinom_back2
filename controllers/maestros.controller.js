@@ -14,11 +14,24 @@ const maestroGet = (req, res)=> {
 
 const maestroPost = (req, res)=> {
     
-    const body = req.body;
+    const {
+        curp,
+        rfc,
+        paterno,
+        materno,
+        nombre,
+        seccion,
+        qna_ing_snte,
+        telefono,
+        correo,
+        domicilio,
+        municipio
+     } = req.body;
+
 
     res.status(202).json({
-    msg:'post API - controlador',
-    body
+        msg:'post API - controlador',
+        datos:req.body
     })
    
 }

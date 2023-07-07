@@ -1,5 +1,6 @@
 const express = require('express')
 const cors = require('cors')
+const { sql, dbConnection } = require('../database/config.db')
 
 class Server {
 
@@ -8,10 +9,16 @@ class Server {
         this.port = process.env.PORT
         this.maestrosPath = '/api/maestros'
 
+         //Crear conexion Base de Datos
+        this.conectarDB()
         //Middlewares
         this.middlewares()
         //Rutas de mi aplicacion
         this.routes()
+    }
+
+    async conectarDB(){
+        await dbConnection()
     }
 
     middlewares(){ 
@@ -21,7 +28,7 @@ class Server {
         this.app.use(express.json())
         //Directorio publico
         this.app.use(express.static('public'))
-
+       
     }
 
     routes(){
