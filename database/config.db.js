@@ -10,7 +10,6 @@ const dbConnection = async()=>{
         options:{
             trustServerCertificate: true
         }
-
     }
 
     try{ 
@@ -21,18 +20,7 @@ const dbConnection = async()=>{
     catch(err){
         console.log('Error al conectar a la base de datos:', err);
     }
-   
-    
-    
-    /*
-    .then(()=>{
-        console.log(`Conexión a la base de datos ${dbSettings.database} establecida`);
-        return pool
-    })
-    .catch((err) => {
-        console.log('Error al conectar a la base de datos:', err);
-    });*/
-
+ 
 }
 
 module.exports = {
