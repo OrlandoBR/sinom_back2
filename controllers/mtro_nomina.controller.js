@@ -121,7 +121,56 @@ const mtroNominaPost = async(req,res)=>{
    
 }
 
+const mtroNominaPut = async(req,res)=>{
+    const {
+        id_trabajador,
+        id_tipo_nomina,
+        qna_desde,
+        qna_hasta,
+        usuario
+        ,cargo=''
+     } = req.body;
+     
+     const { id } = req.params
+    
+     try{
+        const query = `UPDATE MTRO_NOMINAS SET
+                            cargo = '${cargo}',
+                            qna_hasta = '${qna_hasta}',
+                            estatus = '${ qna_hasta=='999999'?0:1 }',
+                            fecha_actualizacion = getdate(),
+                            usuario = '${usuario}'
+                        WHERE id_nom_mtro = '${id}'
+                        `
+        console.log('Actualizando Mtro-Nomina...')
+
+        const pool = await dbConnection()
+        const result = await pool.request().query(query)
+
+        res.status(200).json({
+            msg:'El registro se actualizo exitosamente',
+            datos:req.body,
+            id
+        })
+        console.log('Proceso terminado :')
+     }catch(error){
+        console.error('Error al actualizar el registro:', error)
+        res.status(500).json({
+            msg:'Error al actualizar el registro '
+        })
+     }finally{
+        sql.close
+     }
+
+
+
+
+
+
+}
+
 module.exports = {
     mtroNominaGet,
-    mtroNominaPost
+    mtroNominaPost,
+    mtroNominaPut
 }

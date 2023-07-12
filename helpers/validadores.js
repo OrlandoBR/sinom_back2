@@ -98,8 +98,12 @@ const validaFechasValidas = (valor,req)=>{
     const {qna_desde=0, qna_hasta=0} = req.body
 
     //if (qna_desde!=0 && qna_hasta!=0){
+
+    var entero1 = parseInt(qna_desde, 10);
+    var entero2 = parseInt(qna_hasta, 10);
+       console.log(`${entero1} > ${entero2} `)
        
-        if(qna_desde > qna_hasta){
+       if( entero1 > entero2){
             console.log('- Falló validación')
             throw new Error(`La qna hasta es menor que la qna desde.`)
         }

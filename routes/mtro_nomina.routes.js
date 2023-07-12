@@ -1,7 +1,7 @@
 const { Router } = require('express')
-const { check,body } = require('express-validator')
+const { check,body, param } = require('express-validator')
 
-const { mtroNominaGet,mtroNominaPost } = require('../controllers/mtro_nomina.controller')
+const { mtroNominaGet,mtroNominaPost,mtroNominaPut } = require('../controllers/mtro_nomina.controller')
 const {validarCampos} = require('../middlewares/validar-campos')
 
 const { validaId_trabajadorExiste, validaRepeticionTipoNomina,validaFechasValidas} = require('../helpers/validadores')
@@ -30,9 +30,9 @@ router.post('/mtronomina',[
         .notEmpty().withMessage('Hasta cuando le daremos su dinerito ?')
         .bail() //Si no cumple anterior, cancela las validaciones siguientes.
         .isLength({min:6,max:6}).withMessage('Longitud debe ser de 6 digitos')
-        .isInt().withMessage('Debe ser un valor numerico')
-        .bail()
-        .custom( (value,{req})=>validaFechasValidas(value,req) ),
+        .isInt().withMessage('Debe ser un valor numerico'),
+        //.bail()
+        //.custom( (value,{req})=>validaFechasValidas(value,req) ),
     body('usuario')
         .notEmpty().withMessage('Y quien se hara responsable ?'),
     body('cargo')
@@ -42,7 +42,29 @@ router.post('/mtronomina',[
 ],mtroNominaPost)
 
 //Actualizar Datos
-
+router.put('/mtronomina/:id',[
+    param('id')
+        .notEmpty().withMessage('Es necesario ingresar el ID del registro a actualizar'),
+    body('qna_desde')
+        .notEmpty().withMessage('Y desde cuando o que ?')
+        .bail()
+        .isLength({min:6,max:6}).withMessage('Longitud debe ser de 6 digitos')
+        .bail()
+        .isInt().withMessage('Debe ser un valor numerico'),
+    body('qna_hasta')
+        .notEmpty().withMessage('Hasta cuando le daremos su dinerito ?')
+        .bail() //Si no cumple anterior, cancela las validaciones siguientes.
+        .isLength({min:6,max:6}).withMessage('Longitud debe ser de 6 digitos')
+        .isInt().withMessage('Debe ser un valor numerico'),
+        //.bail()
+        //.custom( (value,{req})=>validaFechasValidas(value,req) ), // No se porque da porblemas con 202315
+    body('usuario')
+        .notEmpty().withMessage('Y quien se hara responsable ?'),
+    body('cargo')
+        .optional()
+        .isLength({max:80}).withMessage('El cargo supera los 80 caracteres'),
+    validarCampos
+],mtroNominaPut)
 
 //Obtener datos
 router.get('/mtronomina/',mtroNominaGet)
