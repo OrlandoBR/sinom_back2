@@ -1,7 +1,7 @@
 const { Router } = require('express')
 const { check } = require('express-validator')
 
-const { maestroGet,maestroGetId, maestroPost, maestroPut } = require('../controllers/maestros.controller')
+const { maestroGet,maestroGetId, maestroPost, maestroPut,maestroGetId_Siguiente } = require('../controllers/maestros.controller')
 
 const {validarCampos} = require('../middlewares/validar-campos')
 const {esUsuarioValido,esId_trabajadorValido,esCurpValido} = require('../helpers/validadores')
@@ -9,7 +9,7 @@ const {esUsuarioValido,esId_trabajadorValido,esCurpValido} = require('../helpers
 const router = Router()
 
 //Insertar Datos
-router.post('/',[
+router.post('/maestros/',[
     check('id_trabajador','El id_trabajdor es obligatorio','elOTRO').not().isEmpty(),
     check('id_trabajador','El id_trabajador debe ser de 7 digitos').isLength({min:7,max:7}),
     check('id_trabajador').custom(esId_trabajadorValido),
@@ -34,7 +34,7 @@ router.post('/',[
 ], maestroPost)
 
 //Actualizar Datos
-router.put('/:id',[
+router.put('/maestros/:id',[
     check('id','El id del maestro ha actualizar debe ser de 7 digitos').isLength({min:7,max:7}),
     
     check('curp','El CURP es obligatorio').not().isEmpty(),
@@ -57,10 +57,16 @@ router.put('/:id',[
 ], maestroPut)
 
 //Obtener datos
-router.get('/',maestroGet)
+router.get('/maestros/',maestroGet)
 
 //Obtener datos por ID
-router.get('/:id',maestroGetId)
+router.get('/maestros/:id',maestroGetId)
+
+//Obtener datos por ID
+router.get('/maestros/id_trabajador/:secc',[
+        check('secc','El parametro secc debe ser un numero').isInt(),
+        validarCampos
+    ],maestroGetId_Siguiente)
 
 
 module.exports = router

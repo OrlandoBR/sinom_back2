@@ -26,16 +26,18 @@ const maestroGet = async(req, res)=> {
     try{
 
         var sql =`SELECT 
-                     id_trabajador, curp, isnull(rfc,'') as rfc,
+                     m.id_trabajador, curp, isnull(rfc,'') as rfc,
                      paterno, isnull(materno,'') as materno, nombre,
                      id_seccion, isnull(qna_ing_snte,'') as qna_ing_snte,
                      isnull(telefono,'') as telefono, isnull(correo,'') as correo,
                      isnull(domicilio,'') as domicilio, isnull(municipio,'') as municipio,
-                     fecha_alta, isnull(fecha_actualizacion,'') as fecha_actualizcion, 
-                     estatus, isnull(usuario,'') as usuario 
-                FROM MAESTRO
+                     m.fecha_alta, isnull(m.fecha_actualizacion,'') as fecha_actualizcion, 
+                     m.estatus, isnull(m.usuario,'') as usuario
+                     , COUNT(n.id_trabajador) AS veces_en_nomina
+                FROM MAESTRO m
+                LEFT JOIN mtro_nominas n ON m.id_trabajador = n.id_trabajador
                 WHERE
-                    id_trabajador like '${id_trabajador}%' 
+                    m.id_trabajador like '${id_trabajador}%' 
                     and curp like '${curp}%'
                     and paterno like '${paterno}%'
                     and materno like '${materno}%'
@@ -44,7 +46,10 @@ const maestroGet = async(req, res)=> {
             if (seccion!=='')
                 sql+= `and id_seccion = ${seccion}`
             
-            sql+= 'ORDER BY curp, id_seccion'
+            sql+= ` GROUP BY m.id_trabajador, curp, rfc, paterno
+                    , materno, nombre, id_seccion, qna_ing_snte
+                    , telefono, correo, domicilio, municipio
+                    , m.fecha_alta, m.fecha_actualizacion, m.estatus, m.usuario `
 
             if (pag_ini !=='' && no_registros!==''){
                 sql+= ` OFFSET ${pag_ini} ROWS FETCH NEXT ${no_registros} ROWS ONLY `
@@ -78,19 +83,24 @@ const maestroGetId = async(req,res)=>{
 
     try{
        var sql =`SELECT 
-                id_trabajador, curp, isnull(rfc,'') as rfc,
-                paterno, isnull(materno,'') as materno, nombre,
-                id_seccion, isnull(qna_ing_snte,'') as qna_ing_snte,
-                isnull(telefono,'') as telefono, isnull(correo,'') as correo,
-                isnull(domicilio,'') as domicilio, isnull(municipio,'') as municipio,
-                fecha_alta, isnull(fecha_actualizacion,'') as fecha_actualizcion, 
-                estatus, isnull(usuario,'') as usuario 
-            FROM MAESTRO
-            WHERE
-                id_trabajador like '${id}' `
+                       m.id_trabajador, curp, isnull(rfc,'') as rfc,
+                       paterno, isnull(materno,'') as materno, nombre,
+                       id_seccion, isnull(qna_ing_snte,'') as qna_ing_snte,
+                       isnull(telefono,'') as telefono, isnull(correo,'') as correo,
+                       isnull(domicilio,'') as domicilio, isnull(municipio,'') as municipio,
+                       m.fecha_alta, isnull(m.fecha_actualizacion,'') as fecha_actualizacion, 
+                       m.estatus, isnull(usuario,'') as usuario 
+                        , COUNT(n.id_trabajador) AS veces_en_nomina
+                FROM maestro m
+                LEFT JOIN mtro_nominas n ON m.id_trabajador = n.id_trabajador
+                WHERE m.id_trabajador = '${id}'
+                GROUP BY m.id_trabajador, curp, rfc, paterno
+                        , materno, nombre, id_seccion, qna_ing_snte
+                        , telefono, correo, domicilio, municipio
+                        , m.fecha_alta, m.fecha_actualizacion, m.estatus, usuario `
     
         console.log(`Consultando maestro id: ${id}.. `)
-        //console.log(sql)
+        console.log(sql)
 
         const pool = await dbConnection()
         const result = await pool.request().query(sql)
@@ -184,7 +194,7 @@ const maestroPost = async(req, res)=> {
    
        console.log("Maestro Creado")
        res.status(200).json({
-           msg:'El maestro se registro correctmaente',
+           msg:'El registro se ha dado de alta exitosamente',
            datos:req.body
        })
 
@@ -243,7 +253,7 @@ const maestroPut = async (req, res)=> {
         const result = await pool.request()
         .query(sql)
        res.status(200).json({
-           msg:'El maestro se actualizo correctamente',
+           msg:'El registro se actualizo exitosamente',
            datos:req.body,
            id
        })
@@ -258,11 +268,61 @@ const maestroPut = async (req, res)=> {
     }
 }
 
+const maestroGetId_Siguiente = async (req,res)=>{
+    const {secc = ''} = req.params
 
+    const sql = `select 
+                    top 1 id_trabajador 
+                 from MAESTRO 
+                    where id_seccion = ${secc} 
+                    and id_trabajador not in (select id_trabajador  
+                                                from maestro where id_seccion = ${secc} 
+                                                                    and id_trabajador like '%PA%') 
+                order by id_trabajador desc`
+
+    console.log(sql)
+    console.log('Obteniendo Id (contador) del maestro')
+    
+    try{
+        const pool = await dbConnection()
+        const result = await pool.request().query(sql)
+
+        let resultado = ''
+        if (result.rowsAffected[0] > 0){
+            let {id_trabajador} = result.recordset[0];
+            let partes = id_trabajador.split("-"); // Divide la cadena en dos partes en el guion
+            let parteIzquierda = partes[0];
+            let parteDerecha = partes[1];
+
+            let numero = parseInt(parteDerecha, 10); // Convierte la parte derecha en un número entero
+            numero += 1; // Suma uno al número
+            let parteDerechaActualizada = numero.toString().padStart(3, "0"); // Agrega ceros a la izquierda si es necesario
+            resultado = parteIzquierda + "-" + parteDerechaActualizada; // Une la parte izquierda con el número incrementado
+            console.log("Id_Trabajdor siguiente: "+resultado); 
+        }
+
+        res.status(200).json({
+            msg: `${result.rowsAffected[0] > 0 ?'El maestro se consulto correctamente':'No existe el registro' }`,
+            total:result.rowsAffected[0],
+            datos:result.rowsAffected[0]>0 ? result.recordset[0].id_trabajador:result.recordset, 
+            siguiente:resultado
+        })
+    }
+    catch(error){
+        console.error('Error al obtener id de maestro:', error)
+        res.status(500).json({
+            msg:'Error al consultar el registro.-> ' + error.message
+        })
+    }finally{
+        sql.close
+    }
+
+}
 
 module.exports = {
     maestroGet,
     maestroGetId,
     maestroPost,
-    maestroPut
+    maestroPut,
+    maestroGetId_Siguiente
 }
