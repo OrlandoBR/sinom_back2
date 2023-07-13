@@ -11,11 +11,13 @@ const obtenNomApagar = async(req,res)=>{
         nomina='',
         id_tipo_pago='', 
         qna_pago='',
-        seccion='' } = req.query
+        seccion='',
+        id_nom_apagar='' } = req.query
 
     if (id_trabajador==='' && curp==='' && id_tipo_pago==='' 
         && qna_pago==='' && paterno==='' && materno ==='' 
-        && nombre ==='' && nomina === '' && seccion === ''){
+        && nombre ==='' && nomina === '' && seccion === ''
+        && id_nom_apagar === ''){
 
         return res.status(400).json({ 
             msg:'Debe ingresar al menos un filtro de busqueda.'
@@ -24,7 +26,8 @@ const obtenNomApagar = async(req,res)=>{
 
     try{
         let query = `SELECT
-                            mtro.id_trabajador
+                            id_nom_apagar
+                            ,mtro.id_trabajador
                             ,curp
                             ,(paterno +' '+ isnull(materno,'')+' '+ nombre) as nombre
                             ,id_seccion as seccion
@@ -47,6 +50,7 @@ const obtenNomApagar = async(req,res)=>{
                             and apagar.id_tipo_pago like '%${id_tipo_pago}%'
                             and qna_pago like '%${qna_pago}%'
                             and id_seccion like '%${seccion}%'
+                            and id_nom_apagar like '${id_nom_apagar}%'
                         `
 
          query+= ' order by qna_pago desc , nomina, curp, consecutivo'
@@ -122,7 +126,7 @@ const obtenNomDetallePagado = async(req,res)=>{
                         inner join Mtro_Nominas mnom on mnom.id_nom_mtro = apagar.id_nom_mtro
                         inner join Maestro mtro on mtro.id_trabajador = mnom.id_trabajador
                     WHERE
-                        hist.id_nom_apagar like '%${id_nom_apagar}%'
+                        hist.id_nom_apagar like '${id_nom_apagar}%'
                         AND sec_persona like '%${seccion}%'
                         AND nomina like '%${nomina}%'
                         AND tipo_pago like '%${id_tipo_pago}%'
@@ -199,7 +203,7 @@ const obtenLiquidoPagado = async(req,res)=>{
                         ,isnull(cve_beneficiario,'') as cve_beneficiario
                         ,isnull(contrato_enlace,'') as contrato_enlace
                         ,hist.qna_pago
-                        ,nomina
+                        ,RTRIM(nomina) as nomina
                         ,tipo_pago
                         ,hist.fecha_alta
                     FROM Nominas_Liquido_Hist hist
@@ -207,7 +211,7 @@ const obtenLiquidoPagado = async(req,res)=>{
                         inner join Mtro_Nominas mnom on mnom.id_nom_mtro = apagar.id_nom_mtro
                         inner join Maestro mtro on mtro.id_trabajador = mnom.id_trabajador
                     WHERE
-                            hist.id_nom_apagar like '%${id_nom_apagar}%'
+                            hist.id_nom_apagar like '${id_nom_apagar}%'
                             AND id_seccion like '%${seccion}%'
                             AND nomina like '%${nomina}%'
                             AND tipo_pago like '%${id_tipo_pago}%'
@@ -216,7 +220,9 @@ const obtenLiquidoPagado = async(req,res)=>{
                             AND isnull(materno,'') like '${materno}%'
                             AND nombre like '%${nombre}%'
                             AND mtro.id_trabajador like '%${id_trabajador}%'
-                            AND hist.qna_pago like '%${qna_pago}%'   `
+                            AND hist.qna_pago like '%${qna_pago}%'   
+                    order by hist.qna_pago, curp
+                    `
 
         //console.log(query)
 
