@@ -67,7 +67,7 @@ router.put('/mtronomina/:id',[
 ],mtroNominaPut)
 
 //Obtener datos
-router.get('/mtronomina/',mtroNominaGet)
+router.get('/mtronomina',mtroNominaGet)
 
 
 module.exports = router

@@ -129,7 +129,7 @@ const maestroPost = async(req, res)=> {
         curp,
         rfc='',
         paterno,
-        materno,
+        materno='',
         nombre,
         seccion,
         qna_ing_snte,

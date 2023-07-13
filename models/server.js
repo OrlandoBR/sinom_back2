@@ -7,7 +7,7 @@ class Server {
     constructor(){
         this.app = express()
         this.port = process.env.PORT
-        this.maestrosPath = '/api/'
+        this.apiPath = '/api/'
 
          //Crear conexion Base de Datos
         this.conectarDB()
@@ -38,8 +38,9 @@ class Server {
         })
         
 
-        this.app.use(this.maestrosPath, require('../routes/maestros.routes'))
-        this.app.use(this.maestrosPath, require('../routes/mtro_nomina.routes'))
+        this.app.use(this.apiPath, require('../routes/maestros.routes'))
+        this.app.use(this.apiPath, require('../routes/mtro_nomina.routes'))
+        this.app.use(this.apiPath, require('../routes/nominas.routes'))
 
 
         //Si no cae en ninguna anterior
