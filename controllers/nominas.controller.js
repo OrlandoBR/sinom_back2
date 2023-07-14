@@ -247,8 +247,107 @@ const obtenLiquidoPagado = async(req,res)=>{
     }
 }
 
+const excluirSeccionPOST = async(req,res)=>{
+
+    const {
+        seccion,
+        qna_pago,
+        id_tipo_nomina,
+        usuario
+    }= req.body
+
+    try{
+            const query = `INSERT INTO NOMINA_SECCEXCLUIDA
+                            (
+                                qna_pago,
+                                id_tipo_nomina,
+                                seccion,
+                                pagare,
+                                usuario,
+                                fecha_alta
+                            )
+                            VALUES (
+                                '${qna_pago}'
+                                '${id_tipo_nomina}',
+                                '${seccion}',
+                                'nopagar',
+                                '${usuario}',
+                                getdate()
+                            )
+                            `
+        console.log('NOMINA_SECCIONEXCLUIDA')
+        console.log(query)
+
+        const pool = await dbConnection()
+        const result = await pool.request().query(query)
+
+        res.status(200).json({
+        mesg:'El registro se ha dado de alta exitosamente',
+        datos: req.body
+        })
+
+    }catch(error){
+        console.error('Error al insertar el registro:', error)
+        res.status(500).json({
+            msg:'Error al insertar el registro '
+        })
+    }
+    finally{
+        sql.close
+    }
+    
+}
+
+const excluirMaestroPost = async(req,res)=>{
+    const {
+        id_nom_mtro,
+        qna_pago,
+        usuario
+    }= req.body
+
+    try{
+            const query = `INSERT INTO NOMINA_MTROEXCLUIDO
+                            (
+                                qna_pago,
+                                id_nom_mtro,
+                                pagare,
+                                usuario,
+                                fecha_alta
+                            )
+                            VALUES (
+                                '${qna_pago}'
+                                '${id_nom_mtro}',
+                                'nopagar',
+                                '${usuario}',
+                                getdate()
+                            )
+                            `
+        console.log('NOMINA_MTROEXCLUIDO')
+        console.log(query)
+
+        const pool = await dbConnection()
+        const result = await pool.request().query(query)
+
+        res.status(200).json({
+        mesg:'El registro se ha dado de alta exitosamente',
+        datos: req.body
+        })
+
+    }catch(error){
+        console.error('Error al insertar el registro:', error)
+        res.status(500).json({
+            msg:'Error al insertar el registro '
+        })
+    }
+    finally{
+        sql.close
+    }
+}
+
 module.exports = {
     obtenNomApagar,
     obtenNomDetallePagado,
-    obtenLiquidoPagado
+    obtenLiquidoPagado,
+    excluirSeccionPOST,
+    excluirMaestroPost
 }

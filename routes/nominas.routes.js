@@ -11,7 +11,7 @@ const router = Router()
 
 router.get('/nomina/apagar',obtenNomApagar)
 
-router.get('/nomina/pagado/',obtenNomDetallePagado)
+router.get('/nomina/pagadodet/',obtenNomDetallePagado)
 
 router.get('/nomina/liquido/',obtenLiquidoPagado)
 
