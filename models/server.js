@@ -41,6 +41,7 @@ class Server {
         this.app.use(this.apiPath, require('../routes/maestros.routes'))
         this.app.use(this.apiPath, require('../routes/mtro_nomina.routes'))
         this.app.use(this.apiPath, require('../routes/nominas.routes'))
+        this.app.use(this.apiPath, require('../routes/usuario.routes'))
 
 
         //Si no cae en ninguna anterior
