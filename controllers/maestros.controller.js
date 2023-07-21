@@ -25,13 +25,14 @@ const maestroGet = async(req, res)=> {
 
     try{
 
-        var sql =`SELECT 
+        var sql =`SELECT
+                    ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) as no,
                      m.id_trabajador, curp, isnull(rfc,'') as rfc,
                      paterno, isnull(materno,'') as materno, nombre,
                      id_seccion, isnull(qna_ing_snte,'') as qna_ing_snte,
                      isnull(telefono,'') as telefono, isnull(correo,'') as correo,
                      isnull(domicilio,'') as domicilio, isnull(municipio,'') as municipio,
-                     m.fecha_alta, isnull(m.fecha_actualizacion,'') as fecha_actualizcion, 
+                     m.fecha_alta, isnull(m.fecha_actualizacion,'') as fecha_actualizacion, 
                      m.estatus, isnull(m.usuario,'') as usuario
                      , COUNT(n.id_trabajador) AS veces_en_nomina
                 FROM MAESTRO m
@@ -42,6 +43,7 @@ const maestroGet = async(req, res)=> {
                     and paterno like '${paterno}%'
                     and materno like '${materno}%'
                     and nombre like  '%${nombre}%'
+                    and id_tipo_nomina like '%${nomina}%'
                 `
             if (seccion!=='')
                 sql+= `and id_seccion = ${seccion}`
@@ -54,6 +56,8 @@ const maestroGet = async(req, res)=> {
             if (pag_ini !=='' && no_registros!==''){
                 sql+= ` OFFSET ${pag_ini} ROWS FETCH NEXT ${no_registros} ROWS ONLY `
             }
+
+            sql+=' ORDER BY CURP, id_seccion'
 
 
         console.log(sql)
