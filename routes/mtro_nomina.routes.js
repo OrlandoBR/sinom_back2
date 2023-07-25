@@ -45,12 +45,12 @@ router.post('/mtronomina',[
 router.put('/mtronomina/:id',[
     param('id')
         .notEmpty().withMessage('Es necesario ingresar el ID del registro a actualizar'),
-    body('qna_desde')
+    /*body('qna_desde')
         .notEmpty().withMessage('Y desde cuando o que ?')
         .bail()
         .isLength({min:6,max:6}).withMessage('Longitud debe ser de 6 digitos')
         .bail()
-        .isInt().withMessage('Debe ser un valor numerico'),
+        .isInt().withMessage('Debe ser un valor numerico'),*/
     body('qna_hasta')
         .notEmpty().withMessage('Hasta cuando le daremos su dinerito ?')
         .bail() //Si no cumple anterior, cancela las validaciones siguientes.

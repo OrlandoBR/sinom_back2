@@ -2,10 +2,10 @@ const { dbConnection, sql } = require('../database/config.db')
 
 const mtroNominaGet = async (req,res)=>{
 
-    const { id_trabajador='', id_tipo_nomina='',id_seccion='' , estatus='', curp='', MtroMasDeUnaNomina='' } = req.query
+    const { id_trabajador='', nomina='',seccion='' , estatus='', curp='', MtroMasDeUnaNomina='' } = req.query
 
-    if ( (id_trabajador == null || id_trabajador==='') && (id_tipo_nomina == null || id_tipo_nomina==='') 
-        && (estatus == null || estatus==='') && (id_seccion==null||id_seccion==='')
+    if ( (id_trabajador == null || id_trabajador==='') && (nomina == null || nomina==='') 
+        && (estatus == null || estatus==='') && (seccion==null||seccion==='')
         && (curp==null||curp==='') && (MtroMasDeUnaNomina==null||MtroMasDeUnaNomina==='') )
     {
         return res.status(400).json({ 
@@ -17,10 +17,14 @@ const mtroNominaGet = async (req,res)=>{
 
     try{
         let sqll =`SELECT  
+                    ROW_NUMBER() OVER(ORDER BY id_seccion, nom.id_tipo_nomina, curp, nom.estatus) as no,
+                    id_nom_mtro,
                     nom.id_trabajador ,mtro.curp
                     ,(isnull(mtro.paterno,'')+' '+ isnull(mtro.materno,'')+' '+mtro.nombre) as nombre, 
-                    id_seccion as seccion, nom.id_tipo_nomina, cat.nomina ,qna_desde, qna_hasta
-                    , isnull(cargo,'') as cargo ,nom.fecha_alta, isnull(nom.fecha_actualizacion,'') as fecha_actualizacion
+                    id_seccion as seccion, nom.id_tipo_nomina, RTRIM(cat.nomina) as nomina ,qna_desde, qna_hasta
+                    ,isnull(cargo,'') as 'cargo_mtro' 
+                    ,nom.fecha_alta
+                    ,isnull(nom.fecha_actualizacion,'') as fecha_actualizacion
                     , nom.estatus, isnull(nom.usuario,'') as usuario
                             
                 FROM MTRO_NOMINAS nom
@@ -28,23 +32,25 @@ const mtroNominaGet = async (req,res)=>{
                     inner join MAESTRO mtro on mtro.id_trabajador = nom.id_trabajador
                 WHERE
                     nom.id_trabajador like '%${id_trabajador}%'
-                    and nom.id_tipo_nomina like '%${id_tipo_nomina}%'
+                    and nom.id_tipo_nomina like '%${nomina}%'
                     and nom.estatus like '%${estatus}%'
                     and curp like '${curp}%'
             `
-            if (id_seccion!=='')
-                sqll+= ` and id_seccion = ${id_seccion}`
+            if (seccion!=='')
+                sqll+= ` and id_seccion = ${seccion}`
             
             if (MtroMasDeUnaNomina!=='')
                 sqll+=` and nom.id_trabajador in (select id_trabajador from Mtro_Nominas group by id_trabajador having count(id_trabajador) >${MtroMasDeUnaNomina})`
 
-            sqll+= ' ORDER BY nombre, nom.id_tipo_nomina'
+            sqll+= ' ORDER BY id_seccion, nom.id_tipo_nomina, curp, nom.estatus'
 
 
-    //console.log(sql)
+    
     
     const pool = await dbConnection()
     const result = await pool.request().query(sqll)
+
+    console.log(sqll)
     console.log('Mtro-Nomina Obtenida')
     res.status(200).json({
         msg: `${result.rowsAffected[0] > 0 ?'El maestro se consulto correctamente':'No existe el registro' }`,
@@ -161,11 +167,6 @@ const mtroNominaPut = async(req,res)=>{
      }finally{
         sql.close
      }
-
-
-
-
-
 
 }
 

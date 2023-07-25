@@ -57,7 +57,7 @@ const maestroGet = async(req, res)=> {
                 sql+= ` OFFSET ${pag_ini} ROWS FETCH NEXT ${no_registros} ROWS ONLY `
             }
 
-            sql+=' ORDER BY CURP, id_seccion'
+            sql+=' ORDER BY id_seccion, CURP '
 
 
         console.log(sql)
