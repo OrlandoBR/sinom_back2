@@ -14,7 +14,7 @@ router.post('/mtronomina',[
         .isLength({min:7,max:7}).withMessage('Longitud debe ser de 7 digitos')
         .bail()
         .custom((id_trabajador)=> validaId_trabajadorExiste(id_trabajador) ),
-    body('id_tipo_nomina')
+    body('nomina')
         .notEmpty().withMessage('Y de que nomina ?')
         .bail()
         .isIn(['1','2','3']).withMessage('El tipo de nomina no existe')

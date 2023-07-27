@@ -73,7 +73,7 @@ const mtroNominaPost = async(req,res)=>{
 
     const {
         id_trabajador,
-        id_tipo_nomina,
+        nomina,
         qna_desde,
         qna_hasta,
         usuario
@@ -81,6 +81,30 @@ const mtroNominaPost = async(req,res)=>{
     } = req.body
 
     try{
+        console.log('Validando datos para insercion...')
+
+        const sqlvalida = `SELECT id_trabajador FROM MTRO_NOMINAS
+                            WHERE
+                                id_trabajador = '${id_trabajador}'
+                                and id_tipo_nomina = ${nomina}
+                                and estatus = 1
+                            `
+        console.log(sqlvalida)
+
+        const pool = await dbConnection()
+        const result2 = await pool.request().query(sqlvalida)
+
+        if(result2.rowsAffected[0]>0){
+
+            console.log('Validando fallida, ya existe el registro')
+            res.status(400).json({
+                msg:'El registro ya existe activo',
+                datos: req.body
+            })
+            return
+        }
+        console.log('Intentando Insertar Mtro-Nomina...')
+
         const sqll = `INSERT INTO MTRO_NOMINAS
                         (
                             id_trabajador
@@ -94,7 +118,7 @@ const mtroNominaPost = async(req,res)=>{
                         )
                         VALUES (
                             '${id_trabajador}'
-                            ,'${id_tipo_nomina}'
+                            ,'${nomina}'
                             ,'${qna_desde}'
                             ,'${qna_hasta}'
                             ,'${cargo}'
@@ -106,11 +130,11 @@ const mtroNominaPost = async(req,res)=>{
             console.log('Insertando Mtro-Nomina')
             console.log(sqll)
 
-            const pool = await dbConnection()
+           // pool = await dbConnection()
             const result = await pool.request().query(sqll)
 
             res.status(200).json({
-                mesg:'El registro se ha dado de alta exitosamente',
+                msg:'El registro se ha dado de alta exitosamente',
                 datos: req.body
             })
        console.log('Proceso terminado :' + result)
@@ -118,7 +142,8 @@ const mtroNominaPost = async(req,res)=>{
     catch(error){
         console.error('Error al insertar el registro:', error)
         res.status(500).json({
-            msg:'Error al insertar el registro '
+            msg:'Error al insertar el registro ',
+            error
         })
     }
     finally{
@@ -143,7 +168,6 @@ const mtroNominaPut = async(req,res)=>{
         const query = `UPDATE MTRO_NOMINAS SET
                             cargo = '${cargo}',
                             qna_hasta = '${qna_hasta}',
-                            estatus = '${ qna_hasta=='999999'?0:1 }',
                             fecha_actualizacion = getdate(),
                             usuario = '${usuario}'
                         WHERE id_nom_mtro = '${id}'
