@@ -276,6 +276,8 @@ const obtenLiquidoPagado = async(req,res)=>{
 }
 
 // Los 2 siguientes ENDPOINTS para los casos que es necesario excluir una seccion o un maestro del calculo de nomina
+const excluirSeccionGet = async(req,res)=>{}
+
 const excluirSeccionPOST = async(req,res)=>{
 
     const {
@@ -291,7 +293,7 @@ const excluirSeccionPOST = async(req,res)=>{
                                 qna_pago,
                                 id_tipo_nomina,
                                 seccion,
-                                pagare,
+                                pagar,
                                 usuario,
                                 fecha_alta
                             )
@@ -299,7 +301,7 @@ const excluirSeccionPOST = async(req,res)=>{
                                 '${qna_pago}'
                                 '${id_tipo_nomina}',
                                 '${seccion}',
-                                'nopagar',
+                                'no',
                                 '${usuario}',
                                 getdate()
                             )
@@ -326,6 +328,109 @@ const excluirSeccionPOST = async(req,res)=>{
     }
     
 }
+
+const excluirMaestroGet = async(req,res)=>{
+    const {
+            id_trabajador='', 
+            curp='',
+            nomina='',
+            qna_pago='',
+            seccion='',
+            pagare='',
+            id_tipo_exclusion=''
+         } = req.query
+
+    if (id_tipo_exclusion==='')
+    {
+        return res.status(400).json({ 
+            msg:'Debe ingresar el tipo de exclusion'
+        })
+    }
+
+    let query = ''
+
+    if (id_tipo_exclusion == '1') //EXCLUSION POR MAESTRO
+    {
+        console.log('Consulta por mtro')
+
+        if (id_trabajador==='' && curp==='' 
+            && nomina==='' && qna_pago===''
+            && seccion===''  && pagare==='' ){
+                return res.status(400).json({ msg:'Debe ingresar al menos un filtro de busqueda para maestro.'
+            })
+        }
+
+        query = `SELECT 
+                        ROW_NUMBER() OVER(ORDER BY tiponom.nomina, mtro.id_seccion, mtro.curp) as no,
+                        id, mtro.id_trabajador, curp,(paterno+' '+materno+' '+nombre) as nombre, id_seccion, RTRIM(nomina) as nomina, qna_pago, pagar
+                        FROM [dbo].[Nomina_MtroExcluido] ex
+                        inner join Mtro_Nominas nom on nom.id_nom_mtro = ex.id_nom_mtro
+                        inner join Cat_Tipo_Nomina tiponom on tiponom.id_tipo_nomina = nom.id_tipo_nomina
+                        inner join Maestro mtro on mtro.id_trabajador = nom.id_trabajador
+                    where 
+                            nom.id_trabajador like '%${id_trabajador}%'
+                            and curp like '${curp}%'
+                            and tiponom.id_tipo_nomina like '${nomina}%'
+                            and qna_pago like '${qna_pago}%'
+                            and pagar like '${pagare}%'    
+                    `
+        if (seccion)
+        query+= ` and id_seccion = '${seccion}' `
+
+        query+= `order by tiponom.nomina, mtro.id_seccion, mtro.curp `
+    }
+
+    if (id_tipo_exclusion == '2') //EXCLUSION POR SECCION
+    {
+        console.log('Consulta por seccion')
+
+        if (nomina==='' && qna_pago===''
+        && seccion===''  && pagare==='' ){
+            return res.status(400).json({ msg:'Debe ingresar al menos un filtro de busqueda para seccion.'
+        })
+        }
+           
+        query = `SELECT 
+                        ROW_NUMBER() OVER(order by seccion, nomina, qna_pago desc, pagar) as no,
+                        seccion, RTRIM(nomina) as nomina, qna_pago, pagar
+                from [dbo].[Nomina_SeccExcluida] ex
+                        inner join Cat_Tipo_Nomina tiponom on tiponom.id_tipo_nomina = ex.id_tipo_nomina
+                WHERE 
+                        tiponom.id_tipo_nomina like '${nomina}%'
+                        and qna_pago like '${qna_pago}%'
+                        and pagar like '${pagare}%'
+                `
+        if (seccion)
+        query+= ` and seccion = '${seccion}' `
+
+        query+= ` order by seccion, nomina, qna_pago desc, pagar `
+    }
+
+    try{
+        //console.log(query)
+
+        const pool = await dbConnection()
+        const result = await pool.request().query(query)
+        console.log(query)
+        console.log('Excluido Obtenido')
+        
+        res.status(200).json({
+            msg: `${result.rowsAffected[0] > 0 ?'Maestro excluido se consulto correctamente':'No existe el registro' }`,
+            total:result.rowsAffected[0],
+            datos:result.recordset,  
+        })
+
+    }catch(error){
+        console.error('Error al consultar: ', error)
+        res.status(500).json({
+            msg:'Error al consultar el registro.-> ' + error.message
+        })
+    }
+    finally{
+        sql.close
+    }
+}
+
 const excluirMaestroPost = async(req,res)=>{
     const {
         id_nom_mtro,
@@ -338,14 +443,14 @@ const excluirMaestroPost = async(req,res)=>{
                             (
                                 qna_pago,
                                 id_nom_mtro,
-                                pagare,
+                                pagar,
                                 usuario,
                                 fecha_alta
                             )
                             VALUES (
                                 '${qna_pago}'
                                 '${id_nom_mtro}',
-                                'nopagar',
+                                'no',
                                 '${usuario}',
                                 getdate()
                             )
@@ -371,6 +476,7 @@ const excluirMaestroPost = async(req,res)=>{
         sql.close
     }
 }
+
 // ******
 
 module.exports = {
@@ -378,5 +484,7 @@ module.exports = {
     obtenNomDetallePagado,
     obtenLiquidoPagado,
     excluirSeccionPOST,
-    excluirMaestroPost
+    excluirMaestroPost,
+    excluirMaestroGet,
+    excluirSeccionGet
 }
