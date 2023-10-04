@@ -42,6 +42,7 @@ class Server {
         this.app.use(this.apiPath, require('../routes/mtro_nomina.routes'))
         this.app.use(this.apiPath, require('../routes/nominas.routes'))
         this.app.use(this.apiPath, require('../routes/usuario.routes'))
+        this.app.use(this.apiPath, require('../routes/catalogos.routes'))
 
 
         //Si no cae en ninguna anterior
