@@ -2,7 +2,10 @@ const express = require('express')
 const cors = require('cors')
 const { sql, dbConnection } = require('../database/config.db')
 
+
 class Server {
+
+
 
     constructor(){
         this.app = express()
@@ -22,6 +25,11 @@ class Server {
     }
 
     middlewares(){ 
+            // Configurar CORS para permitir solicitudes desde tu aplicación Vue.js (ajusta los orígenes permitidos según sea necesario)
+            let corsOptions = {
+                origin: 'http://10.0.1.51:8081/', // Cambia esto a la URL de tu aplicación Vue.js
+                optionsSuccessStatus: 200,
+            };
         //CORS
         this.app.use(cors())
         //Lectura y Parseo del Body

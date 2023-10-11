@@ -536,21 +536,23 @@ const excluirPut = async(req,res)=>{
 //Sirve para crear una Nomina la cual contendra todos los calculos ordinarios y adicionales de la QNA indicada.
 const crearNomina = async(req,res)=>{
     const {
-        qna_pago='',
+        qna_calculo='',
         usuario='obalmaceda',
     }= req.body
 
+    console.log(req.body)
+
     try{
     
-    if (qna_pago === '' || qna_pago.length !=6 ){
-        console.log('Falta parametro qna_pago')
+    if (qna_calculo === '' || qna_calculo.length !=6 ){
+        console.log('Falta parametro qna_calculo')
         res.status(400).json({
-            msg: 'Falta el parametro qna_pago correcto',
+            msg: 'Falta el parametro qna_calculo correcto',
          })
          return
     }
 
-    let valida = isValidDateText_noMenor_noMayor(qna_pago)
+    let valida = isValidDateText_noMenor_noMayor(qna_calculo)
     if(!valida)
     {
         console.log(`La Quincena Pago es anterior o mayor a 1 quincena respecto a la qna '${calculaQuincena()}' actual`)
@@ -560,7 +562,7 @@ const crearNomina = async(req,res)=>{
     }
     else{
          //Validar si el registro ya existe para la qna indicada.
-        let query = `SELECT id_pago_nomina FROM Pago_Nomina where qna_pago = '${qna_pago}' `
+        let query = `SELECT id_pago_nomina FROM Pago_Nomina where qna_calculo = '${qna_calculo}' `
 
         const pool = await dbConnection()
         const result = await pool.request().query(query)
@@ -569,15 +571,15 @@ const crearNomina = async(req,res)=>{
         
         if(existe >0) //Ya existe valor
         {
-            console.log('Registro ya existe para la quincena indicada')
+            console.log(`Registro ya existe para la quincena ${qna_calculo}`)
             res.status(400).json({
-                msg: 'Registro ya existe para la quincena indicada',
+                msg:`Registro ya existe para la quincena ${qna_calculo}`,
             })
         }
         else  //Se procede con la creación.
         { 
-            query =  `INSERT INTO Pago_Nomina ( qna_pago, activa, fecha_creacion, usuario )
-                        VALUES ( '${qna_pago}', 'SI', getdate(), '${usuario}' ) `
+            query =  `INSERT INTO Pago_Nomina ( qna_calculo, activa, fecha_creacion, usuario )
+                        VALUES ( '${qna_calculo}', 'SI', getdate(), '${usuario}' ) `
             
             await pool.request().query(query)
 
@@ -616,6 +618,7 @@ const actualizarNomina = async(req,res)=>{
          return
     }
 
+    console.log('actualizar Nomina')
     try{
         let query = `UPDATE PAGO_NOMINA
                         SET activa = 'NO', fecha_actualizacion = getdate(), usuario= '${usuario}'
@@ -627,7 +630,7 @@ const actualizarNomina = async(req,res)=>{
         let mensaje =''
         if(resultado.rowsAffected[0] > 0 )
         {
-            mensaje= 'El registro se ha actualizado correctamente'
+            mensaje= 'La quincena se ha cerrado correctamente'
         }
         else
         {
@@ -658,13 +661,13 @@ const consultarEstatusNomina = async(req,res)=>{
         qna_pago='',
     }= req.body
 
-    if (qna_pago !== '' && qna_pago.length !=6 ){
+    /*if (qna_pago !== '' && qna_pago.length !=6 ){
         console.log('Falta parametro qna_pago')
         res.status(400).json({
             msg: 'Falta el parametro qna_pago correcto',
          })
          return
-    }
+    }*/
 
     try{
         let query = `SELECT top(10) * from PAGO_NOMINA `
@@ -672,6 +675,10 @@ const consultarEstatusNomina = async(req,res)=>{
         if(qna_pago !== ''){
             query+=`where qna_pago = '${qna_pago}' `
         }
+
+        
+         query = `select id_pago_nomina, qna_calculo from [dbo].[Pago_Nomina] where activa = 'SI'`
+
 
         const pool = await dbConnection()
         let result = await pool.request().query(query)
@@ -698,62 +705,74 @@ const consultarEstatusNomina = async(req,res)=>{
 //Sirve para calcular la nomina en base a los parametros indicados y ejecutar el SP
 const calcularNomina = async(req,res)=>{
     const {
-        id_tipo_nom  	= '',      // 1.CES, 2.CEN, 3.CONTRATURNO, 4.ESPECIAL, 5.PRESTACIONES
-        tipo_pago       = '',      // 1.ORDINARIA, 6.ADICIONAL
-        tipo_subpago    = '',      // 1.SALARIO, 2.PRESTACION, 3.RETROACTIVO, 4.AGUINALDO
-        forma_pago      = '',       // DEPOSITO , NO_ORDEN
-        seccion         = '%%',     // si se especifica solo se calcula para la seccion indicada.
-        id_trabajador   = '%%',     // si se especifica solo se calcula para el mtro indicado.
-        qna_pago_desde  = '',       // se indica la qna_pago desde que se paga.
-        qna_pago_hasta  = '',       // se indica la qna_pago hasta la cual se paga
+        nomina 	= '',      // 1.CES, 2.CEN, 3.CONTRATURNO, 4.ESPECIAL, 5.PRESTACIONES
+        id_tipo_pago       = '',      // 1.ORDINARIA, 6.ADICIONAL
+        id_tipo_subpago    = '',      // 1.SALARIO, 2.PRESTACION, 3.RETROACTIVO, 4.AGUINALDO
+        forma_pago      ,       // DEPOSITO , NO_ORDEN
+        seccion         ,     // si se especifica solo se calcula para la seccion indicada.
+        id_trabajador   ,//= '',     // si se especifica solo se calcula para el mtro indicado.
+        qna_pago_desde  ,       // se indica la qna_pago desde que se paga.
+        qna_pago        = '',       // se indica la qna_pago hasta la cual se paga
         qna_calculo     = '',       // se indica la qna_calculo actual
-        norden          = '',       // Numero de Orden a partir del cual se le asigna al pago del maestro.
+        norden          ,       // Numero de Orden a partir del cual se le asigna al pago del maestro.
         usuario         = 'obalmaceda',
-        preview         = 'SI',	    //- Indica si se calcula en tablas temporales para previsualizar el calculo o se afecten las tablas reales.
+        previsualizar        = 'SI',	    //- Indica si se calcula en tablas temporales para previsualizar el calculo o se afecten las tablas reales.
     }= req.body
 
     let params_faltantes=''
 
-    if (id_tipo_nom === '' ){
-        params_faltantes += ' id_tipo_nom '
+    console.log(req.body)
+
+    if (nomina === '' ){
+        params_faltantes += ' - Tipo de nomina'
     }
-    if (tipo_pago === '' ){
-        params_faltantes += ' tipo_pago '
+    if (id_tipo_pago === '' ){
+        params_faltantes += ' - Tipo de pago'
     }
-    if (tipo_subpago === '' ){
-        params_faltantes += ' tipo_subpago '
+    if (id_tipo_subpago === '' ){
+        params_faltantes += ' - Tipo subpago'
     }
-    if (forma_pago !== '' && (forma_pago!=='DEPOSITO' || forma_pago!=='NO_ORDEN') ){
-        params_faltantes += ' forma_pago '
+    /*if (forma_pago !== '' && (forma_pago!=='DEPOSITO' || forma_pago!=='NO_ORDEN') ){
+        params_faltantes += ' - Forma de pago'
+    }*/
+   /* if (seccion !== ''){
+      if(seccion.length > 2){
+        params_faltantes += ' - Seccion'
+        }
+    }*/
+    /*if (id_trabajador === '' ){
+        params_faltantes += ' - Id trabajador'
+    }*/
+    if(qna_pago_desde){
+        console.log("qna_pago_desde:" + qna_pago_desde)
+        if ((qna_pago_desde.length !== 6 || isNaN(qna_pago_desde))){
+            params_faltantes += ' - Quincena pago desde'
+        }
     }
-    if (seccion !== '' && (seccion.length > 2)){
-        params_faltantes += ' seccion '
+        
+
+    if (qna_pago === '' || qna_pago.length !== 6 || isNaN(qna_pago)  ){
+        params_faltantes += ' - Quincena pago hasta'
     }
-    if (id_trabajador === '' ){
-        params_faltantes += ' id_trabajador '
-    }
-    if (qna_pago_desde !== '' && (qna_pago_desde.length !== 6 || !isNaN(qna_pago_desde))){
-        params_faltantes += ' qna_pago_desde '
-    }
-    if (qna_pago_hasta === '' || qna_pago_hasta.length !== 6 || isNaN(qna_pago_hasta)  ){
-        params_faltantes = ' qna_pago_hasta '
-    }
-    if (qna_calculo === '' || qna_calculo.length !== 6 || isNaN(qna_calculo)  ){
-        params_faltantes = ' qna_calculo '
-    }
-    console.log(norden)
-    if (norden !== '' && isNaN(norden) ){
-        params_faltantes += ' norden '
-    }
+    //if (qna_calculo === '' || qna_calculo.length !== 6 || isNaN(qna_calculo)  ){
+    //    params_faltantes = ' qna_calculo '
+    //}
+
+    if (norden){
+        if (isNaN(norden) )
+            params_faltantes += ' - # orden'
+    }   
+    
     if (usuario === ''){
-        params_faltantes += ' usuario '
+        params_faltantes += ' - Usuario'
     }
-    if (preview === '' || (preview!=='SI' && preview!=='NO') ){
-        params_faltantes += ' preview '
+    if (previsualizar === '' || (previsualizar!=='SI' && previsualizar!=='NO') ){
+        params_faltantes += ' - previsualizar '
     }
 
     if (params_faltantes!=='')
     {
+        console.log('ERROR CONTROLADO')
         res.status(400).json({
             msg: 'Error al enviar los siguientes parametros: ' + params_faltantes
          })
@@ -774,28 +793,35 @@ const calcularNomina = async(req,res)=>{
             });
 
         let result2 = await pool.request()
-        .input('id_tipo_nom', sql.VarChar(1), id_tipo_nom)
-        .input('tipo_pago', sql.VarChar(1), tipo_pago)
-        .input('tipo_subpago', sql.VarChar(1), tipo_subpago)
+        .input('id_tipo_nom', sql.VarChar(1), nomina)
+        .input('tipo_pago', sql.VarChar(1), id_tipo_pago)
+        .input('tipo_subpago', sql.VarChar(1), id_tipo_subpago)
         .input('forma_pago', sql.VarChar(15), forma_pago)
-        .input('seccion', sql.VarChar(2), seccion)
-        .input('id_trabajador', sql.VarChar(10), id_trabajador)
+        .input('seccion', sql.VarChar(2), seccion )
+        .input('id_trabajador', sql.VarChar(80), id_trabajador)
         .input('qna_calculo', sql.VarChar(6), qna_calculo)
         .input('qna_pago_desde', sql.VarChar(6), qna_pago_desde)
-        .input('qna_pago_hasta', sql.VarChar(6), qna_pago_hasta)
+        .input('qna_pago_hasta', sql.VarChar(6), qna_pago)
         .input('norden', sql.VarChar(6), norden)
         .input('usuario', sql.VarChar(20), usuario)
-        .input('preview', sql.VarChar(2), preview)
-        .output('mensaje', sql.VarChar(100))
+        .input('preview', sql.VarChar(2), previsualizar)
+        .output('mensaje', sql.VarChar(150))
+        .output('mensaje2', sql.VarChar(150))
+        .output('mensaje3', sql.VarChar(200))
         .execute('GeneraNomina')
 
         const resultSets = result2.recordsets;
-        console.log(result2.recordsets.length)
-        console.log(result2.output.mensaje)
+        //console.log(result2.recordsets.length)
+        //console.log(result2.output.mensaje)
+        
+        console.log(result2)
+        //console.log(forma_pago)
+
         res.status(200).json({
             msg: `${result2.recordsets.length > 0 ?`Nomina Calculada, ${result2.output.mensaje}`:`No se genero ningun calculo, revise parametros. ${result2.output.mensaje}` }`,
             total:result2.recordsets.length,
-            datos:resultSets,  
+            //datos:resultSets,  
+            datos:result2.recordset,  
         })
 
     }
@@ -803,7 +829,7 @@ const calcularNomina = async(req,res)=>{
         console.error('Error al calcular Nomina:', error)
         res.status(500).json({
             msg:'Error al calcular Nomina',
-            error: error.originalError.info
+            error: error.originalError
         })
     }
     finally{
@@ -812,6 +838,83 @@ const calcularNomina = async(req,res)=>{
 
 }
 
+const obtenQuincenaActiva = async(req,res)=>{
+    try{
+        let query = `select id_pago_nomina, qna_calculo from [dbo].[Pago_Nomina] where activa = 'SI'`
+
+        const pool = await dbConnection()
+        let result = await pool.request().query(query)
+
+        console.error('Obteniendo Quincena Activa')
+        res.status(200).json({
+            msg: `${result.rowsAffected[0] > 0 ?'La Quincena Activa se consulto correctamente':'No existe el registro' }`,
+            total:result.rowsAffected[0],
+            datos:result.recordset,  
+        })
+    }catch(error)
+    {
+        console.error('Error al consultar el registro:', error)
+        res.status(500).json({
+            msg:'Error al consultar el registro ',
+            error: error.originalError.info
+        })
+    }
+
+}
+
+const cierraQuincenaActiva = async(req,res)=>{
+    try{
+        let query = `select id_pago_nomina, qna_calculo from [dbo].[Pago_Nomina] where activa = 'SI' `
+
+        const pool = await dbConnection() 
+        let result = await pool.request().query(query) 
+
+        console.error('Obteniendo Quincena Activa')
+        res.status(200).json({
+            msg: `${result.rowsAffected[0] > 0 ?'La Quincena Activa se consulto correctamente':'No existe el registro' }`,
+            total:result.rowsAffected[0],
+            datos:result.recordset,  
+        })
+
+    }catch(error)
+    {
+        console.error('Error al consultar crear el registro:', error)
+        res.status(500).json({
+            msg:'Error al crear el registro ',
+            error: error.originalError.info
+        })
+    }
+}
+
+const creaQuincenaActiva = async(req,res)=>{
+
+    const {
+        qna_calculo,
+        usuario,
+    }= req.body
+
+    try{
+        let query = `insert into pago_nomina (qna_calculo, activa, fecha_creacion, usuario) values (${qna_calculo},'SI',getdate(),${usuario})`
+
+        const pool = await dbConnection()
+        let result = await pool.request().query(query)
+
+        console.error('Creando Quincena Activa')
+        res.status(200).json({
+            msg: `${result.rowsAffected[0] > 0 ?'La Quincena Activa se creo correctamente':'No existe el registro' }`,
+            total:result.rowsAffected[0],
+            datos:result.recordset,  
+        })
+
+    }catch(error)
+    {
+        console.error('Error al consultar crear el registro:', error)
+        res.status(500).json({
+            msg:'Error al crear el registro ',
+            error: error.originalError.info
+        })
+    }
+}
 
 module.exports = {
     obtenNomApagar,
@@ -823,5 +926,8 @@ module.exports = {
     crearNomina,
     actualizarNomina,
     consultarEstatusNomina,
-    calcularNomina
+    calcularNomina,
+    obtenQuincenaActiva,
+    creaQuincenaActiva,
+    cierraQuincenaActiva
 }
