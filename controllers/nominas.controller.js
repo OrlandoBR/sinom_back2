@@ -14,15 +14,20 @@ const obtenNomApagar = async(req,res)=>{
         materno='',
         nombre='',
         nomina='',
-        id_tipo_pago='', 
+        id_tipo_pago='',
+        id_tipo_subpago='',
         qna_pago='',
         seccion='',
-        id_nom_apagar='' } = req.query
+        id_nom_apagar='',
+        qna_calculo=''
+         } = req.query
 
     if (id_trabajador==='' && curp==='' && id_tipo_pago==='' 
         && qna_pago==='' && paterno==='' && materno ==='' 
         && nombre ==='' && nomina === '' && seccion === ''
-        && id_nom_apagar === ''){
+        && id_nom_apagar === '' && qna_calculo===''
+        && id_tipo_subpago==='' 
+        ){
 
         return res.status(400).json({ 
             msg:'Debe ingresar al menos un filtro de busqueda.'
@@ -31,21 +36,29 @@ const obtenNomApagar = async(req,res)=>{
 
     try{
         let query = `SELECT
-                            ROW_NUMBER() OVER(ORDER BY qna_pago DESC, nomina, id_seccion, curp, consecutivo) as no,
-                            id_nom_apagar
-                            ,mtro.id_trabajador
-                            ,curp
-                            ,(paterno +' '+ isnull(materno,'')+' '+ nombre) as nombre
-                            ,id_seccion as seccion
-                            ,qna_pago
-                            ,consecutivo as pago
-                            ,RTRIM(nomina) as nomina
-                            ,tipo_pago
-                        FROM Nominas_APagar apagar
-                            inner join Mtro_Nominas mnom on mnom.id_nom_mtro = apagar.id_nom_mtro
-                            inner join Maestro mtro on mtro.id_trabajador = mnom.id_trabajador
-                            inner join Cat_Tipo_Nomina tnom on tnom.id_tipo_nomina = mnom.id_tipo_nomina
-                            inner join Cat_Tipo_Pago tpago on tpago.id_tipo_pago = apagar.id_tipo_pago
+                        ROW_NUMBER() OVER(ORDER BY qna_pago_hasta DESC, nomina, id_seccion, curp, consecutivo) as no,
+                        id_nom_apagar
+                        ,mtro.id_trabajador
+                        ,curp
+                        ,(paterno +' '+ isnull(materno,'')+' '+ nombre) as nombre
+                        ,id_seccion as seccion
+                        ,qna_calculo
+                        ,ISNULL(qna_pago_desde,qna_pago_hasta) as qna_pago_desde
+                        ,qna_pago_hasta
+                        ,consecutivo as pago
+                        ,RTRIM(nomina) as nomina
+                        ,tipo_pago as 'tipo pago'
+                        ,subpago.sub_pago as 'sub pago'
+                        ,pago.usuario
+                        
+                    FROM Nominas_APagar apagar
+                        inner join Mtro_Nominas         mnom on mnom.id_nom_mtro = apagar.id_nom_mtro
+                        inner join Maestro              mtro on mtro.id_trabajador = mnom.id_trabajador
+                        inner join Pago_Nomina          pago on pago.id_pago_nomina = apagar.id_pago_nomina
+                        inner join Cat_Tipo_Nomina      tnom on tnom.id_tipo_nomina = mnom.id_tipo_nomina
+                        inner join Cat_Tipo_Pago        tpago on tpago.id_tipo_pago = apagar.id_tipo_pago
+                        inner join Cat_Tipo_SubPago    subpago on subpago.id_tipo_subpago = apagar.id_tipo_subpago
+
                         WHERE
                             mtro.id_trabajador like '%${id_trabajador}%'
                             and curp like '${curp}%'
@@ -54,8 +67,9 @@ const obtenNomApagar = async(req,res)=>{
                             and nombre like '%${nombre}%'
                             and tnom.id_tipo_nomina like '%${nomina}%'
                             and apagar.id_tipo_pago like '%${id_tipo_pago}%'
-                            and qna_pago like '%${qna_pago}%'
-                        
+                            and apagar.id_tipo_subpago like '%${id_tipo_subpago}%'
+                            and qna_pago_hasta like '%${qna_pago}%'
+                            and qna_calculo like '%${qna_calculo}%'
                         `
         if (seccion)
             query+= ` and id_seccion = '${seccion}'` 
@@ -64,7 +78,7 @@ const obtenNomApagar = async(req,res)=>{
             query+= ` and id_nom_apagar = '${id_nom_apagar}'` 
         
 
-         query+= ' order by qna_pago desc , nomina, id_seccion, curp, consecutivo'
+         query+= ' order by qna_calculo, nomina, id_seccion, curp, consecutivo'
 
        // console.log(query)
 
@@ -103,23 +117,31 @@ const obtenNomDetallePagado = async(req,res)=>{
         nombre='',
         nomina='',
         id_tipo_pago='', 
+        id_tipo_subpago='', 
         qna_pago='',
         seccion='',
-        id_nom_apagar='' } = req.query
+        id_nom_apagar='',
+        qna_calculo=''
+    } = req.query
+
+    console.log('Obteniendo Detalle Pagado ...')
 
     if (id_trabajador==='' && curp==='' 
         && paterno==='' && materno===''
         && nombre==='' && nomina===''
         && id_tipo_pago==='' && qna_pago===''
         && seccion==='' && id_nom_apagar===''
+        && qna_calculo ==='' &&  id_tipo_subpago===''
         ){
-
-        return res.status(400).json({ 
-            msg:'Debe ingresar al menos un filtro de busqueda.'
-        })
+            console.log('Error de parametros al consultar detalle')
+            return res.status(400).json({ 
+                    msg:'Debe ingresar al menos un filtro de busqueda.'
+              })
     }
 
     try{
+
+        let condiciones =''
         let query = `SELECT
                         ROW_NUMBER() OVER(ORDER BY hist.id_nom_apagar , plaza, perc_ded, concepto  ) as no,
                         hist.id_nom_apagar
@@ -127,42 +149,135 @@ const obtenNomDetallePagado = async(req,res)=>{
                         ,(paterno+' '+isnull(materno,'')+' '+ nombre) as nombre
                         ,consecutivo as '# pago'
                         , plaza
-                        , perc_ded
+                        , perc_ded as 'P/D'
                         , concepto
+                        ,importe
+                        ,sec_plaza as 'S.Plza'
+                        ,sec_persona as 'S.Per'
+                        ,nivel
+                        ,zona
+                        ,qna_calculo
+                        ,apagar.qna_pago_desde as qna_desde
+                        ,apagar.qna_pago_hasta as qna_hasta
+                        ,tnom.nomina
+                        ,tpago.tipo_pago as 'tipo pago'
+                        ,subpago.sub_pago as 'sub pago'
+                        --hist.* ,' - ' as HIST ,apagar.*,' - ' as APAGAR ,mnom.*,' - ' as MTRONOM, pago.*,' - ' as PAGO, mtro.*
+                    FROM Nominas_Pagadas_Hist hist
+                        inner join Nominas_APagar   apagar on apagar.id_nom_apagar = hist.id_nom_apagar
+                        inner join Mtro_Nominas     mnom on mnom.id_nom_mtro = apagar.id_nom_mtro
+                        inner join Pago_Nomina      pago on pago.id_pago_nomina = apagar.id_pago_nomina
+                        inner join Maestro          mtro on mtro.id_trabajador = mnom.id_trabajador
+                        inner join Cat_Tipo_Nomina  tnom on tnom.id_tipo_nomina = mnom.id_tipo_nomina
+                        inner join Cat_Tipo_Pago    tpago on tpago.id_tipo_pago = apagar.id_tipo_pago
+                        inner join Cat_Tipo_SubPago subpago on subpago.id_tipo_subpago = apagar.id_tipo_subpago 
+                    `
+
+        if (id_nom_apagar!=='')
+            condiciones = `&hist.id_nom_apagar like '${id_nom_apagar}%'` 
+        if (seccion!=='')
+            condiciones = condiciones +`&sec_persona = '${seccion}'`
+        if (nomina!=='')
+            condiciones = condiciones +`&tnom.id_tipo_nomina = '${nomina}'`
+        if (id_tipo_pago!=='')
+            condiciones = condiciones +`&tpago.id_tipo_pago = '${id_tipo_pago}'`
+        if (id_tipo_subpago!=='')
+            condiciones = condiciones +`&subpago.id_tipo_subpago = '${id_tipo_subpago}'`
+        if (curp!=='')
+            condiciones = condiciones +`&curp like '%${curp}%'`
+        if(paterno!=='')
+            condiciones = condiciones +`&paterno like '${paterno}%'`
+        if(materno!=='')
+            condiciones = condiciones +`&materno like '${materno}%'`
+        if(nombre!=='')
+            condiciones = condiciones +`&nombre like '${nombre}%'`
+        if(id_trabajador!=='')
+            condiciones = condiciones +`&mtro.id_trabajador like '%${id_trabajador}%'`
+        if(qna_calculo!=='')
+            condiciones = condiciones +`&pago.qna_calculo = '${qna_calculo}'`
+        if(qna_pago!=='')
+            condiciones = condiciones +`&apagar.qna_pago_hasta = '${qna_pago}'`
+            
+        let nuevaCadena = condiciones.split('&').join(" and ");
+            nuevaCadena = nuevaCadena.replace(/\band\b/, '');
+
+        query = query + 'WHERE ' + nuevaCadena + ' order by hist.id_nom_apagar , plaza, perc_ded, concepto'
+        console.log (query)
+
+        const pool = await dbConnection()
+        const result = await pool.request().query(query)
+        console.log('Nomina Detalle Pagada Obtenida')
+        //console.log(query)
+
+        res.status(200).json({
+            msg: `${result.rowsAffected[0] > 0 ?'Historico de pago se consulto correctamente':'No existe el registro' }`,
+            total:result.rowsAffected[0],
+            datos:result.recordset,  
+        })
+
+    }catch(error){
+        console.error('Error al consultar: ', error)
+        res.status(500).json({
+            msg:'Error al consultar el registro.-> ' + error.message
+        })
+    }
+    finally{
+        sql.close
+    }
+
+}
+
+const obtenDetallePagadoMaestro= async(req,res)=>{
+    const {
+        id_trabajador='', 
+        qna_calculo='',
+        no_pago=''
+    } = req.query
+
+    console.log('Obteniendo Detalle De Maestro Pagado ...')
+
+    if (id_trabajador==='' && qna_calculo ==='' &&  no_pago===''
+        ){
+            console.log('Error de parametros al consultar detalle')
+            return res.status(400).json({ 
+                    msg:'Debe ingresar al menos un filtro de busqueda.'
+              })
+    }
+
+    try{
+
+        let query = `select 
+                        ROW_NUMBER() OVER(ORDER BY  qna_calculo,id_trabajador, plaza, perc_ded, concepto, importe  ) as no
+                        ,id_trabajador
+                        ,qna_calculo
+                        ,consecutivo as 'pago'
+                        ,tnom.nomina
+                        ,plaza
+                        ,perc_ded as 'P/D'
+                        ,concepto
                         ,importe
                         ,sec_plaza
                         ,sec_persona
                         ,nivel
                         ,zona
-                        ,hist.qna_pago
-                        ,RTRIM(hist.nomina) as nomina
-                        ,tpago.tipo_pago
-                    FROM Nominas_Pagadas_Hist hist
-                        inner join Nominas_APagar apagar on apagar.id_nom_apagar = hist.id_nom_apagar
-                        inner join Mtro_Nominas mnom on mnom.id_nom_mtro = apagar.id_nom_mtro
-                        inner join Maestro mtro on mtro.id_trabajador = mnom.id_trabajador
-                        inner join Cat_Tipo_Nomina tnom on tnom.id_tipo_nomina = mnom.id_tipo_nomina
-                        inner join Cat_Tipo_Pago tpago on tpago.tipo_pago = hist.tipo_pago
-                    WHERE
-                        hist.id_nom_apagar like '${id_nom_apagar}%'
-                        AND sec_persona like '${seccion}'
-                        and tnom.id_tipo_nomina like '%${nomina}%'
-                        AND tpago.id_tipo_pago like '%${id_tipo_pago}%'
-                        AND curp like '%${curp}%'
-                        AND paterno like '${paterno}%'
-                        AND materno like '${materno}%'
-                        AND nombre like '%${nombre}%'
-                        AND mtro.id_trabajador like '%${id_trabajador}%'
-                        AND hist.qna_pago like '%${qna_pago}%'
-
-                    order by hist.id_nom_apagar , plaza, perc_ded, concepto `
-
-       // 
+                        ,detalle.fecha_alta
+                    from Nominas_APagar apagar
+                        inner join Pago_Nomina					pago on pago.id_pago_nomina = apagar.id_pago_nomina 
+                        inner join Mtro_Nominas					nom on nom.id_nom_mtro = apagar.id_nom_mtro
+                        inner join [dbo].[Nominas_Pagadas_Hist] detalle on detalle.id_nom_apagar = apagar.id_nom_apagar
+                        inner join Cat_Tipo_Nomina				tnom on tnom.id_tipo_nomina = nom.id_tipo_nomina
+                    where qna_calculo = '${qna_calculo}'
+                            and consecutivo = '${no_pago}'
+                            and id_trabajador = '${id_trabajador}'
+                    order by qna_calculo,id_trabajador, plaza, perc_ded, concepto, importe
+                    `
+       
+        console.log (query)
 
         const pool = await dbConnection()
         const result = await pool.request().query(query)
         console.log('Nomina Detalle Pagada Obtenida')
-        console.log(query)
+        //console.log(query)
 
         res.status(200).json({
             msg: `${result.rowsAffected[0] > 0 ?'Historico de pago se consulto correctamente':'No existe el registro' }`,
@@ -184,7 +299,7 @@ const obtenNomDetallePagado = async(req,res)=>{
 
 //Se obtiene de BD liquido calculado sobre el pago al maestro.
 const obtenLiquidoPagado = async(req,res)=>{
-   
+
     const {
         id_trabajador='', 
         curp='',
@@ -193,15 +308,19 @@ const obtenLiquidoPagado = async(req,res)=>{
         nombre='',
         nomina='',
         id_tipo_pago='', 
+        id_tipo_subpago='', 
         qna_pago='',
         seccion='',
-        id_nom_apagar='' } = req.query
+        id_nom_apagar='',
+        qna_calculo=''
+    } = req.query
 
     if (id_trabajador==='' && curp==='' 
         && paterno==='' && materno===''
         && nombre==='' && nomina===''
         && id_tipo_pago==='' && qna_pago===''
         && seccion==='' && id_nom_apagar===''
+        && id_tipo_subpago==='' &&  qna_calculo===''
         ){
 
         return res.status(400).json({ 
@@ -210,51 +329,74 @@ const obtenLiquidoPagado = async(req,res)=>{
     }
 
     try{
+        let condiciones =''
         let query = `select
-                        ROW_NUMBER() OVER(ORDER BY hist.qna_pago desc , tnom.nomina, id_seccion, curp, consecutivo  ) as no,
+                        ROW_NUMBER() OVER(ORDER BY liq.qna_pago desc , tnom.nomina, id_seccion, curp, consecutivo  ) as no,
                         id_nom_liq_hist
                        
-                        ,hist.id_nom_apagar
+                        ,liq.id_nom_apagar
                         ,mtro.id_trabajador
                         ,curp
                         ,(paterno+' '+isnull(materno,'')+' '+ nombre) as nombre
-                        ,consecutivo as '# pago'
+                        ,consecutivo as 'pago'
                         ,percepcion,deduccion
                         ,liquido
                         ,banco
                         ,isnull(no_cuenta,'') as no_cuenta
+                        ,liq.no_orden
                         ,isnull(cve_beneficiario,'') as cve_beneficiario
                         ,isnull(contrato_enlace,'') as contrato_enlace
                         ,id_seccion as seccion
-                        ,hist.qna_pago
-                        ,RTRIM(hist.nomina) as nomina
+                        ,pago.qna_calculo
+                        ,apagar.qna_pago_desde as qna_desde
+						,apagar.qna_pago_hasta as qna_hasta
+                        ,apagar.xdias
+                        ,tnom.nomina
                         ,tpago.tipo_pago
-                        ,hist.fecha_alta
-                    FROM Nominas_Liquido_Hist hist
-                        inner join Nominas_APagar apagar on apagar.id_nom_apagar = hist.id_nom_apagar
-                        inner join Mtro_Nominas mnom on mnom.id_nom_mtro = apagar.id_nom_mtro
-                        inner join Maestro mtro on mtro.id_trabajador = mnom.id_trabajador
-                        inner join Cat_Tipo_Nomina tnom on tnom.id_tipo_nomina = mnom.id_tipo_nomina
-                        inner join Cat_Tipo_Pago tpago on tpago.tipo_pago = hist.tipo_pago
-                    WHERE
-                            hist.id_nom_apagar like '${id_nom_apagar}%'
-                        
-                            and tnom.id_tipo_nomina like '%${nomina}%'
-                            AND tpago.id_tipo_pago like '%${id_tipo_pago}%'
-                            AND curp like '%${curp}%'
-                            AND paterno like '${paterno}%'
-                            AND isnull(materno,'') like '${materno}%'
-                            AND nombre like '%${nombre}%'
-                            AND mtro.id_trabajador like '%${id_trabajador}%'
-                            AND hist.qna_pago like '%${qna_pago}%'
+                        ,tspago.sub_pago
+                        ,liq.fecha_alta
+                    FROM  Nominas_APagar apagar
+                    inner join Nominas_Liquido_Hist liq on liq.id_nom_apagar = apagar.id_nom_apagar
+                    inner join Pago_Nomina pago on pago.id_pago_nomina = apagar.id_pago_nomina
+                    inner join Mtro_Nominas nom on nom.id_nom_mtro = apagar.id_nom_mtro
+                    inner join Maestro mtro on mtro.id_trabajador = nom.id_trabajador
+                    inner join Cat_Tipo_Nomina tnom on tnom.id_tipo_nomina = nom.id_tipo_nomina
+                    inner join Cat_Tipo_Pago tpago on tpago.id_tipo_pago = apagar.id_tipo_pago
+                    inner join Cat_Tipo_SubPago tspago on tspago.id_tipo_subpago = apagar.id_tipo_subpago
+
                     `
 
-        if(seccion)
-            query+= `  AND id_seccion = '${seccion}'`            
+        if (id_nom_apagar!=='')
+            condiciones = `&hist.id_nom_apagar like '${id_nom_apagar}%'` 
+        if (seccion!=='')
+            condiciones = condiciones +`&mtro.id_seccion = '${seccion}'`
+        if (nomina!=='')
+            condiciones = condiciones +`&tnom.id_tipo_nomina = '${nomina}'`
+        if (id_tipo_pago!=='')
+            condiciones = condiciones +`&tpago.id_tipo_pago = '${id_tipo_pago}'`
+        if (id_tipo_subpago!=='')
+            condiciones = condiciones +`&subpago.id_tipo_subpago = '${id_tipo_subpago}'`
+        if (curp!=='')
+            condiciones = condiciones +`&curp like '%${curp}%'`
+        if(paterno!=='')
+            condiciones = condiciones +`&paterno like '${paterno}%'`
+        if(materno!=='')
+            condiciones = condiciones +`&materno like '${materno}%'`
+        if(nombre!=='')
+            condiciones = condiciones +`&nombre like '%${nombre}%'`
+        if(id_trabajador!=='')
+            condiciones = condiciones +`&mtro.id_trabajador like '%${id_trabajador}%'`
+        if(qna_calculo!=='')
+            condiciones = condiciones +`&pago.qna_calculo = '${qna_calculo}'`
+        if(qna_pago!=='')
+            condiciones = condiciones +`&apagar.qna_pago_hasta = '${qna_pago}'`
+            
+        let nuevaCadena = condiciones.split('&').join(" and ");
+            nuevaCadena = nuevaCadena.replace(/\band\b/, '');
 
+        query = query + ' WHERE ' + nuevaCadena + ' order by apagar.qna_pago_hasta , tnom.nomina, id_seccion, curp, consecutivo'
+        console.log (query)
 
-        query+= `    order by hist.qna_pago desc , tnom.nomina, id_seccion, curp, consecutivo`
-        //console.log(query)
 
         const pool = await dbConnection()
         const result = await pool.request().query(query)
@@ -270,7 +412,7 @@ const obtenLiquidoPagado = async(req,res)=>{
     }catch(error){
         console.error('Error al consultar: ', error)
         res.status(500).json({
-            msg:'Error al consultar el registro.-> ' + error.message
+            msg:'Error al consultar el registro.-> ' + error.message 
         })
     }
     finally{
@@ -537,7 +679,7 @@ const excluirPut = async(req,res)=>{
 const crearNomina = async(req,res)=>{
     const {
         qna_calculo='',
-        usuario='obalmaceda',
+        usuariosistema='sinusuario',
     }= req.body
 
     console.log(req.body)
@@ -579,7 +721,7 @@ const crearNomina = async(req,res)=>{
         else  //Se procede con la creación.
         { 
             query =  `INSERT INTO Pago_Nomina ( qna_calculo, activa, fecha_creacion, usuario )
-                        VALUES ( '${qna_calculo}', 'SI', getdate(), '${usuario}' ) `
+                        VALUES ( '${qna_calculo}', 'SI', getdate(), '${usuariosistema}' ) `
             
             await pool.request().query(query)
 
@@ -607,7 +749,7 @@ const actualizarNomina = async(req,res)=>{
 
     const {
         id_pago_nomina='',
-        usuario='obalmaceda',
+        usuariosistema='sinusuario',
     }= req.body
 
     if (id_pago_nomina === ''){
@@ -621,7 +763,7 @@ const actualizarNomina = async(req,res)=>{
     console.log('actualizar Nomina')
     try{
         let query = `UPDATE PAGO_NOMINA
-                        SET activa = 'NO', fecha_actualizacion = getdate(), usuario= '${usuario}'
+                        SET activa = 'NO', fecha_actualizacion = getdate(), usuario= '${usuariosistema}'
                         WHERE id_pago_nomina = '${id_pago_nomina}'`
 
         const pool = await dbConnection()
@@ -660,14 +802,6 @@ const consultarEstatusNomina = async(req,res)=>{
     const {
         qna_pago='',
     }= req.body
-
-    /*if (qna_pago !== '' && qna_pago.length !=6 ){
-        console.log('Falta parametro qna_pago')
-        res.status(400).json({
-            msg: 'Falta el parametro qna_pago correcto',
-         })
-         return
-    }*/
 
     try{
         let query = `SELECT top(10) * from PAGO_NOMINA `
@@ -715,7 +849,7 @@ const calcularNomina = async(req,res)=>{
         qna_pago        = '',       // se indica la qna_pago hasta la cual se paga
         qna_calculo     = '',       // se indica la qna_calculo actual
         norden          ,       // Numero de Orden a partir del cual se le asigna al pago del maestro.
-        usuario         = 'obalmaceda',
+        usuariosistema  = '',
         previsualizar        = 'SI',	    //- Indica si se calcula en tablas temporales para previsualizar el calculo o se afecten las tablas reales.
     }= req.body
 
@@ -763,7 +897,7 @@ const calcularNomina = async(req,res)=>{
             params_faltantes += ' - # orden'
     }   
     
-    if (usuario === ''){
+    if (usuariosistema === ''){
         params_faltantes += ' - Usuario'
     }
     if (previsualizar === '' || (previsualizar!=='SI' && previsualizar!=='NO') ){
@@ -803,7 +937,7 @@ const calcularNomina = async(req,res)=>{
         .input('qna_pago_desde', sql.VarChar(6), qna_pago_desde)
         .input('qna_pago_hasta', sql.VarChar(6), qna_pago)
         .input('norden', sql.VarChar(6), norden)
-        .input('usuario', sql.VarChar(20), usuario)
+        .input('usuario', sql.VarChar(20), usuariosistema)
         .input('preview', sql.VarChar(2), previsualizar)
         .output('mensaje', sql.VarChar(150))
         .output('mensaje2', sql.VarChar(150))
@@ -838,87 +972,10 @@ const calcularNomina = async(req,res)=>{
 
 }
 
-const obtenQuincenaActiva = async(req,res)=>{
-    try{
-        let query = `select id_pago_nomina, qna_calculo from [dbo].[Pago_Nomina] where activa = 'SI'`
-
-        const pool = await dbConnection()
-        let result = await pool.request().query(query)
-
-        console.error('Obteniendo Quincena Activa')
-        res.status(200).json({
-            msg: `${result.rowsAffected[0] > 0 ?'La Quincena Activa se consulto correctamente':'No existe el registro' }`,
-            total:result.rowsAffected[0],
-            datos:result.recordset,  
-        })
-    }catch(error)
-    {
-        console.error('Error al consultar el registro:', error)
-        res.status(500).json({
-            msg:'Error al consultar el registro ',
-            error: error.originalError.info
-        })
-    }
-
-}
-
-const cierraQuincenaActiva = async(req,res)=>{
-    try{
-        let query = `select id_pago_nomina, qna_calculo from [dbo].[Pago_Nomina] where activa = 'SI' `
-
-        const pool = await dbConnection() 
-        let result = await pool.request().query(query) 
-
-        console.error('Obteniendo Quincena Activa')
-        res.status(200).json({
-            msg: `${result.rowsAffected[0] > 0 ?'La Quincena Activa se consulto correctamente':'No existe el registro' }`,
-            total:result.rowsAffected[0],
-            datos:result.recordset,  
-        })
-
-    }catch(error)
-    {
-        console.error('Error al consultar crear el registro:', error)
-        res.status(500).json({
-            msg:'Error al crear el registro ',
-            error: error.originalError.info
-        })
-    }
-}
-
-const creaQuincenaActiva = async(req,res)=>{
-
-    const {
-        qna_calculo,
-        usuario,
-    }= req.body
-
-    try{
-        let query = `insert into pago_nomina (qna_calculo, activa, fecha_creacion, usuario) values (${qna_calculo},'SI',getdate(),${usuario})`
-
-        const pool = await dbConnection()
-        let result = await pool.request().query(query)
-
-        console.error('Creando Quincena Activa')
-        res.status(200).json({
-            msg: `${result.rowsAffected[0] > 0 ?'La Quincena Activa se creo correctamente':'No existe el registro' }`,
-            total:result.rowsAffected[0],
-            datos:result.recordset,  
-        })
-
-    }catch(error)
-    {
-        console.error('Error al consultar crear el registro:', error)
-        res.status(500).json({
-            msg:'Error al crear el registro ',
-            error: error.originalError.info
-        })
-    }
-}
-
 module.exports = {
     obtenNomApagar,
     obtenNomDetallePagado,
+    obtenDetallePagadoMaestro,
     obtenLiquidoPagado,
     excluirPost,
     excluirGet,
@@ -927,7 +984,5 @@ module.exports = {
     actualizarNomina,
     consultarEstatusNomina,
     calcularNomina,
-    obtenQuincenaActiva,
-    creaQuincenaActiva,
-    cierraQuincenaActiva
+
 }

@@ -4,6 +4,8 @@ const mtroNominaGet = async (req,res)=>{
 
     const { id_trabajador='', nomina='',seccion='' , estatus='', curp='', MtroMasDeUnaNomina='' } = req.query
 
+    console.log('Obteniendo Maestro en Nomina...')
+
     if ( (id_trabajador == null || id_trabajador==='') && (nomina == null || nomina==='') 
         && (estatus == null || estatus==='') && (seccion==null||seccion==='')
         && (curp==null||curp==='') && (MtroMasDeUnaNomina==null||MtroMasDeUnaNomina==='') )
@@ -16,31 +18,32 @@ const mtroNominaGet = async (req,res)=>{
     console.log('Buscando Mtro-Nomina..')
 
     try{
-        let sqll =`SELECT  
+        let sqll =`select 
                     ROW_NUMBER() OVER(ORDER BY id_seccion, nom.id_tipo_nomina, curp, nom.estatus) as no,
                     id_nom_mtro,
-                    nom.id_trabajador ,mtro.curp
-                    ,(isnull(mtro.paterno,'')+' '+ isnull(mtro.materno,'')+' '+mtro.nombre) as nombre, 
-                    id_seccion as seccion, nom.id_tipo_nomina, RTRIM(cat.nomina) as nomina ,qna_desde, qna_hasta
-                    ,isnull(cargo,'') as 'cargo_mtro' 
+                    mtro.id_trabajador ,mtro.curp
+                    ,(isnull(mtro.paterno,'')+' '+ isnull(mtro.materno,'')+' '+mtro.nombre) as nombre,
+                    id_seccion as seccion, nom.id_tipo_nomina
+                     ,RTRIM(ISNULL(cat.nomina,'')) as nomina 
+                     ,qna_desde, qna_hasta
+                    ,isnull(cargo,'') as 'cargo_mtro'
                     ,nom.fecha_alta
                     ,isnull(nom.fecha_actualizacion,'') as fecha_actualizacion
-                    , nom.estatus, isnull(nom.usuario,'') as usuario
-                            
-                FROM MTRO_NOMINAS nom
-                    inner join CAT_TIPO_NOMINA cat on cat.id_tipo_nomina = nom.id_tipo_nomina
-                    inner join MAESTRO mtro on mtro.id_trabajador = nom.id_trabajador
+                    , nom.estatus, isnull(nom.usuario,'') as usuario 
+                from Maestro mtro
+                    left join Mtro_Nominas nom on nom.id_trabajador = mtro.id_trabajador
+                    left join CAT_TIPO_NOMINA cat on cat.id_tipo_nomina = nom.id_tipo_nomina
                 WHERE
-                    nom.id_trabajador like '%${id_trabajador}%'
-                    and nom.id_tipo_nomina like '%${nomina}%'
-                    and nom.estatus like '%${estatus}%'
+                    mtro.id_trabajador like '%${id_trabajador}%'
+                    and ISNULL(nom.id_tipo_nomina,'') like '%${nomina}%'
+                    and mtro.estatus like '%${estatus}%'
                     and curp like '${curp}%'
             `
             if (seccion!=='')
                 sqll+= ` and id_seccion = ${seccion}`
             
             if (MtroMasDeUnaNomina!=='')
-                sqll+=` and nom.id_trabajador in (select id_trabajador from Mtro_Nominas group by id_trabajador having count(id_trabajador) >${MtroMasDeUnaNomina})`
+                sqll+=` and mtro.id_trabajador in (select id_trabajador from Mtro_Nominas group by id_trabajador having count(id_trabajador) >${MtroMasDeUnaNomina})`
 
             sqll+= ' ORDER BY id_seccion, nom.id_tipo_nomina, curp, nom.estatus'
 

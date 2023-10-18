@@ -43,7 +43,7 @@ const maestroGet = async(req, res)=> {
                     and paterno like '${paterno}%'
                     and materno like '${materno}%'
                     and nombre like  '%${nombre}%'
-                    and id_tipo_nomina like '%${nomina}%'
+                    and ISNULL(id_tipo_nomina,'') like '%${nomina}%'
                 `
             if (seccion!=='')
                 sql+= `and id_seccion = ${seccion}`
@@ -149,6 +149,7 @@ const maestroPost = async(req, res)=> {
 
         const pool = await dbConnection()
         const result = await pool.request()
+        .input('id_trabajador',sql.VarChar,id_trabajador)
         .input('curp',sql.VarChar,curp)
         .input('rfc',sql.VarChar,rfc)
         .input('paterno',sql.VarChar,paterno)
@@ -160,7 +161,7 @@ const maestroPost = async(req, res)=> {
         .input('qna_ing_snte',sql.VarChar,qna_ing_snte)
         .input('domicilio',sql.VarChar,domicilio)
         .input('municipio',sql.VarChar,municipio)
-        .input('id_trabajador',sql.VarChar,id_trabajador)
+       
         .input('usuario',sql.VarChar,usuario)
         .query(`INSERT INTO MAESTRO 
                 (  id_trabajador,
@@ -323,10 +324,12 @@ const maestroGetId_Siguiente = async (req,res)=>{
 
 }
 
+
 module.exports = {
     maestroGet,
     maestroGetId,
     maestroPost,
     maestroPut,
-    maestroGetId_Siguiente
+    maestroGetId_Siguiente,
+
 }

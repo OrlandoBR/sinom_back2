@@ -4,7 +4,7 @@ const { query } = require('express-validator')
 const { obtenNomApagar,obtenNomDetallePagado, obtenLiquidoPagado
         ,excluirGet,excluirPost,excluirPut
         ,crearNomina,actualizarNomina,consultarEstatusNomina
-        ,calcularNomina,obtenQuincenaActiva,creaQuincenaActiva , cierraQuincenaActiva
+        ,calcularNomina,obtenDetallePagadoMaestro
             } = require('../controllers/nominas.controller')
 //const {validarCampos} = require('../middlewares/validar-campos')
 
@@ -16,6 +16,9 @@ const router = Router()
 router.get('/nomina/apagar',obtenNomApagar)
 
 router.get('/nomina/pagadodet/',obtenNomDetallePagado)
+
+router.get('/nomina/pagadodetmaestro/',obtenDetallePagadoMaestro)
+
 
 router.get('/nomina/liquido/',obtenLiquidoPagado)
 
